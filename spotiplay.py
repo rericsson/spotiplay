@@ -14,6 +14,7 @@ def show_tracks(tracks):
         track = item['track']
         print(f"{i} {track['artists'][0]['name']}-{track['name']}")
 
+
 def show_playlist(sp, playlist):
     """Displays playlist"""
 

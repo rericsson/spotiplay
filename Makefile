@@ -3,13 +3,13 @@ install:
 		pip install -r requirements.txt
 
 test:
-	python -m pytest -vv --cov=mylib --cov=hello test_hello.py
+	python -m pytest -vv --cov=mylib --cov=spotiplay test_spotiplay.py
 
 
 lint:
-	pylint --disable=R,C hello.py mylib/*.py
+	pylint --disable=R,C spotiplay.py test_spotiplay.py
 
 format:
-	black *.py mylib/*.py
+	black *.py
 
 all: install lint test
