@@ -5,3 +5,4 @@ pytest-cov
 click
 flask
 black
+spotipy
