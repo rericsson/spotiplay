@@ -8,13 +8,18 @@ def test_cli():
     assert result.exit_code == 0
     assert "No subcommand invoked." in result.output
 
+
 def test_get_playlists():
     runner = CliRunner()
     result = runner.invoke(cli, ["get-playlists"])
     assert result.exit_code == 0
 
-def test_get_track():
+
+def test_create_and_unfollow_playlist():
     runner = CliRunner()
-    result = runner.invoke(cli, ["get-track", "--title", "Sunspots", "--artist", "Julian Cope"])
+    result = runner.invoke(
+        cli, ["create-playlist", "./test_data/covers/", "--name", "Foo"]
+    )
     assert result.exit_code == 0
-    assert "Sunspots: 3kqG0YpTHcg2oPG6cDB8jx" in result.output
+    result = runner.invoke(cli, ["unfollow-playlist", "--name", "Foo"])
+    assert result.exit_code == 0

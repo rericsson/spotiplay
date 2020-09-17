@@ -3,6 +3,8 @@
 
 import sys
 import click
+import glob
+import csv
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
@@ -10,8 +12,8 @@ from spotipy.oauth2 import SpotifyOAuth
 def show_tracks(tracks):
     """Displays the tracks"""
 
-    for i, item in enumerate(tracks['items']):
-        track = item['track']
+    for i, item in enumerate(tracks["items"]):
+        track = item["track"]
         print(f"{i} {track['artists'][0]['name']}-{track['name']}")
 
 
@@ -21,12 +23,24 @@ def show_playlist(sp, playlist):
     print()
     print(f"{playlist['name']}")
     print(f"  tracks:{playlist['tracks']['total']}")
-    results = sp.playlist(playlist['id'], fields='tracks, next')
-    tracks = results['tracks']
+    results = sp.playlist(playlist["id"], fields="tracks, next")
+    tracks = results["tracks"]
     show_tracks(tracks)
-    while tracks['next']:
+    while tracks["next"]:
         tracks = sp.next(tracks)
         show_tracks(tracks)
+
+
+def get_track(title, artist):
+    """Gets the list of title id for the given track"""
+
+    track_ids = []
+    sp = spotipy.Spotify(auth_manager=SpotifyOAuth())
+    q = f"track:{title} artist:{artist}"
+    tracks = sp.search(q)
+    for track in tracks["tracks"]["items"]:
+        track_ids.append(track["id"])
+    return track_ids
 
 
 @click.group(invoke_without_command=True)
@@ -39,7 +53,11 @@ def cli(ctx):
 
 
 @cli.command()
-@click.option("--mine/--not-mine", default=False, help="Display all playlists (--not-mine) or just my creations (--mine)")
+@click.option(
+    "--mine/--not-mine",
+    default=False,
+    help="Display all playlists (--not-mine) or just my creations (--mine)",
+)
 def get_playlists(mine):
     """Retrieves Spotify playlists for logged in user"""
 
@@ -49,26 +67,64 @@ def get_playlists(mine):
     me = sp.current_user()
     playlists = sp.current_user_playlists()
 
-    for playlist in playlists['items']:
+    for playlist in playlists["items"]:
         if mine:
-            if playlist['owner']['id'] == me['id']:
+            if playlist["owner"]["id"] == me["id"]:
                 show_playlist(sp, playlist)
         else:
             show_playlist(sp, playlist)
 
 
+@cli.command()
+@click.argument("source", type=click.Path(exists=True))
+@click.option("--name", required=True, help="Name of playlist")
+@click.option("--description", help="Description of playlist")
+def create_playlist(source, name, description):
+    """Create a playlist for the current user"""
+
+    scope = "playlist-modify-public"
+
+    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope))
+    me = sp.current_user()
+    # create a playlist
+    playlist = sp.user_playlist_create(
+        me["id"], name=name, description=description, public=True
+    )
+    playlist_id = playlist["id"]
+
+    # add the tracks from the Google Play Music playlist folder
+    for filename in glob.glob(f"{source}/Tracks/*.csv"):
+        with open(filename) as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                # get the tracks for the title and artist
+                # there might be quite a few different versions
+                track_ids = get_track(title=row["Title"], artist=row["Artist"])
+                # if we get a result, take the first one(???) and add it.
+                if track_ids:
+                    sp.playlist_add_items(playlist_id, [track_ids[0]])
+                else:
+                    print(f"Could not find {row['Title']} by {row['Artist']}")
+
+    # show what we created
+    show_playlist(sp, playlist)
+
 
 @cli.command()
-@click.option("--title", required=True, help="Track title to look up")
-@click.option("--artist", help="Track artist")
-def get_track(title, artist):
-    """Gets the title id for the given track"""
+@click.option("--name", required=True, help="Name of playlist")
+def unfollow_playlist(name):
+    """Unfollow a playlist"""
 
-    sp = spotipy.Spotify(auth_manager=SpotifyOAuth())
-    q = f"track:{title} artist:{artist}"
-    tracks = sp.search(q)
-    for track in tracks['tracks']['items']:
-        print(f"{track['name']}: {track['id']}")
+    scope = "playlist-modify-public"
+    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope))
+    me = sp.current_user()
+    playlists = sp.current_user_playlists()
+
+    # get my playlists
+    for playlist in playlists["items"]:
+        if playlist["owner"]["id"] == me["id"]:
+            if playlist["name"] == name:
+                sp.current_user_unfollow_playlist(playlist["id"])
 
 
 if __name__ == "__main__":
