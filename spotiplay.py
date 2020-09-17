@@ -4,6 +4,7 @@
 import sys
 import click
 import glob
+import html
 import csv
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
@@ -93,18 +94,22 @@ def create_playlist(source, name, description):
     playlist_id = playlist["id"]
 
     # add the tracks from the Google Play Music playlist folder
-    for filename in glob.glob(f"{source}/Tracks/*.csv"):
+    print(source)
+    for filename in glob.glob(f"{source}/*.csv"):
         with open(filename) as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
+                # the contents of the csv file are html encoded
+                title = html.unescape(row["Title"])
+                artist = html.unescape(row["Artist"])
                 # get the tracks for the title and artist
                 # there might be quite a few different versions
-                track_ids = get_track(title=row["Title"], artist=row["Artist"])
+                track_ids = get_track(title=title, artist=artist)
                 # if we get a result, take the first one(???) and add it.
                 if track_ids:
                     sp.playlist_add_items(playlist_id, [track_ids[0]])
                 else:
-                    print(f"Could not find {row['Title']} by {row['Artist']}")
+                    print(f"Could not find {title} by {artist}")
 
     # show what we created
     show_playlist(sp, playlist)
